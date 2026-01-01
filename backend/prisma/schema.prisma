@@ -1,0 +1,106 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Owner/Shop Owner Model
+model Owner {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String   // hashed
+  name      String
+  shopName  String
+  phone     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  parkingSessions ParkingSession[]
+  settings        ParkingSettings?
+
+  @@map("owners")
+}
+
+// Parking Settings (per owner)
+model ParkingSettings {
+  id                String   @id @default(uuid())
+  ownerId           String   @unique
+  hourlyRate        Float    @default(0) // Default hourly rate
+  currency          String   @default("USD")
+  autoCalculate     Boolean  @default(true) // Auto-calculate charges
+  whatsappEnabled   Boolean  @default(true)
+  whatsappNumber    String?  // Owner's WhatsApp number for sending receipts
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  owner Owner @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@map("parking_settings")
+}
+
+// Vehicle Entry/Exit Sessions
+model ParkingSession {
+  id              String    @id @default(uuid())
+  ownerId         String
+  vehicleNumber   String    // Number plate
+  entryTime       DateTime
+  exitTime        DateTime?
+  entryImageUrl   String?   // Image from number plate recognition
+  exitImageUrl    String?
+  durationMinutes Int?      // Calculated duration
+  amount          Float?    // Parking charge
+  amountType      String    @default("auto") // "auto" or "manual"
+  status          String    @default("active") // "active", "completed", "cancelled"
+  receiptSent     Boolean   @default(false) // WhatsApp receipt sent
+  receiptSentAt   DateTime?
+  notes           String?
+  createdAt       DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  owner Owner @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@index([ownerId])
+  @@index([vehicleNumber])
+  @@index([entryTime])
+  @@index([status])
+  @@map("parking_sessions")
+}
+
+// Vehicle History (for analytics)
+model VehicleHistory {
+  id            String   @id @default(uuid())
+  vehicleNumber String
+  ownerId       String
+  totalVisits   Int      @default(0)
+  totalSpent    Float    @default(0)
+  lastVisit     DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([vehicleNumber, ownerId])
+  @@index([ownerId])
+  @@index([vehicleNumber])
+  @@map("vehicle_history")
+}
+
+// System Logs (for debugging and audit)
+model SystemLog {
+  id        String   @id @default(uuid())
+  level     String   // "info", "warn", "error"
+  message   String
+  metadata  String?  // JSON string for additional data
+  ownerId   String?
+  createdAt DateTime @default(now())
+
+  @@index([ownerId])
+  @@index([createdAt])
+  @@map("system_logs")
+}
+
